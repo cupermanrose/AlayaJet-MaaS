@@ -85,6 +85,25 @@
 这三层的边界就是自研边界（1.2.4）：部署期与请求期只写声明与配置；执行期委托引擎——当前为
 SGLang，属可替换组件（第 9 章）。
 
+**部署期**（蓝 = 主线，红 = 前置 / 持续机制 / 分支）：
+
+![部署期](diagrams/period_deploy.svg)
+
+⓪ 权重预热（发布前提）→ ① 变更请求（发布 / 扩容 / 回滚 / 缩容，校验后受理）→ ② 渲染并提交
+CR → ③ OME watch CR → ④ 创建 / 更新工作负载（LWS / Deployment）→ ⑤a Kueue gang 放行 ·
+⑤b Scheduler 绑机 → ⑥ 下发拉起 → ⑦ 加载 NVMe 权重（分钟级）→ ⑧ 服务发现（watch · 探测后
+加入）。⑨ 缩容分支：排空 → 删 Pod → 释放整机，权重副本保留。热暂停只改 `desired_state`
+（摘除路由，不动工作负载）。
+
+**请求期**：
+
+![请求期](diagrams/period_request.svg)
+
+① 推理请求 → ② cache-aware 选 P · 负载选 D · 直连 leader Pod IP → ③ 逐 token 流回 →
+④ 流式响应。⑤ 旁路计量：gateway 日志与 usage → Usage Ledger → Kafka，投递上游为异步。
+⑥ 重试：换实例重投，仅响应开始前。⑦ 取消：断连沿直连传播，引擎 `abort_request`。
+⑧ 健康探测（health_generate）· 故障摘除：能生成 token 才算可用，覆盖 LWS 整组。
+
 #### 1.2.3 数据视角
 
 ![数据模型图](diagrams/data_model.svg)
