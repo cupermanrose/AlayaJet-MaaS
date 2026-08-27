@@ -82,8 +82,7 @@
 | 请求期 | 毫秒级 | sgl-model-gateway | 按 model 选池、cache-aware 选 P、负载选 D、完成配对与转发；重试、熔断、限流、排队 |
 | 执行期 | 每 token | 推理引擎（当前 SGLang + Mooncake TE / NIXL） | prefill 计算、KV 经 RDMA 传输、逐 token 生成 |
 
-这三层的边界就是自研边界（1.2.4）：部署期与请求期只写声明与配置；执行期委托引擎——当前为
-SGLang，属可替换组件（第 9 章）。
+部署期与请求期只写声明与配置；执行期委托引擎——当前为 SGLang，属可替换组件（第 9 章）。
 
 **部署期**（蓝 = 主线，红 = 前置 / 持续机制 / 分支）：
 
@@ -104,6 +103,18 @@ CR → ③ OME watch CR → ④ 创建 / 更新工作负载（LWS / Deployment�
 ⑥ 重试：换实例重投，仅响应开始前。⑦ 取消：断连沿直连传播，引擎 `abort_request`。
 ⑧ 健康探测（health_generate）· 故障摘除：能生成 token 才算可用，覆盖 LWS 整组。
 
+**执行期**：
+
+![执行期](diagrams/period_execute.svg)
+
+① gateway 逐请求双发 P / D（D 带 bootstrap，预分配 KV 块），HTTP Server · TokenizerManager
+经 ZeroMQ 将 token ids 与参数交给 Scheduler ×8（TP rank 进程）→ ② 连续批处理：每步从
+waiting 组一批，交 Model Runner（CUDA graph）→ ③ CPU 下发 kernel · GPU 回传 token ids，
+KV 由 kernel 在 HBM 就地读写 → ④ prefill 完成，KV 从 P 侧 HBM 经 GPUDirect RDMA 直达
+D 侧 HBM（不经 CPU / DDR，Mooncake TE / NIXL 为控制面），完成通知使请求入 D 侧 running →
+⑤ decode 每步全体 running 各出 1 token → ⑥ DetokenizerManager 增量还原文本，SSE 流回
+gateway。⑦ HiCache：KV 沿 HBM ⇄ DDR ⇄ NVMe 经 PCIe 分层换入换出。
+
 #### 1.2.3 数据视角
 
 ![数据模型图](diagrams/data_model.svg)
@@ -115,16 +126,6 @@ CR → ③ OME watch CR → ④ 创建 / 更新工作负载（LWS / Deployment�
 | 服务请求（绿，右列） | 请求 → 执行尝试 → 用量记录 → 用量事件 | 只增不改，更正以修正事件追加 | 第 5、7 章 |
 
 每个实体的职责与数据不变量见第 6 章。
-
-#### 1.2.4 自研边界
-
-第一期自研只有两个进程，其余是上游固版组件加我们的配置资产：
-
-1. **自研进程**：Control Plane（模型生命周期 + Management API + 渲染 OME CR）、
-   Usage Ledger（用量计量）。
-2. **上游固版**：sgl-model-gateway、SGLang 引擎、OME、LWS · Kueue、K8s · DRA、
-   Kafka / Prometheus 等通用件，按镜像 tag / chart 版本固定（2.4）。
-3. **配置与资产**：OME CR 模板、调度与节点配置、引导运维脚本、可观测资产、评测压测。
 
 ### 1.3 设计红线
 

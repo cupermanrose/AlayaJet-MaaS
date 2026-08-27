@@ -103,9 +103,9 @@ def carc(x1, y1, cx, cy, x2, y2, c, sw=4):
 
 def save(name, base, color, title, elems, lx=(560, 700)):
     if base is None:
-        base = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 830" '
+        base = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 720" '
                 'font-family="system-ui,-apple-system,\'PingFang SC\',\'Microsoft YaHei\',sans-serif">'
-                '<rect width="1400" height="830" rx="10" fill="#FFFFFF"/>')
+                '<rect width="1400" height="730" rx="10" fill="#FFFFFF"/>')
     parts = [base, cline(60, 64, 94, 64, color, sw=5), ctext(102, 68.5, title, color, fs=13.5),
              cline(lx[0], 64, lx[0] + 34, 64, color), ctext(lx[0] + 42, 68.5, "主线步骤", color),
              cline(lx[1], 64, lx[1] + 34, 64, AUX), ctext(lx[1] + 42, 68.5, "前置 / 持续机制 / 分支", AUX)]
@@ -240,63 +240,71 @@ def xchip(x, y, w, h, l1, l2=None, fs=12):
         out += xt(x + w/2, y + h/2 + 4, l1, weight="bold", fs=fs)
     return out
 
-def machine_ex(x, title, procs, r2, zgap):
-    out = [xr(x, 160, 620, 560, sw=2.4, rx=10), xt(x + 310, 184, title, weight="bold")]
-    out.append(xr(x + 16, 196, 588, 168, dash="5,4", rx=8))
-    out.append(xt(x + 28, 212, "Pod · SGLang（多进程）", anchor="start", weight="bold"))
+def machine_ex(x, title, procs, r2, zgap, zpayload):
+    out = [xr(x, 118, 620, 492, sw=2.4, rx=10), xt(x + 310, 142, title, weight="bold")]
+    out.append(xr(x + 16, 154, 588, 168, dash="5,4", rx=8))
+    out.append(xt(x + 28, 170, "Pod · SGLang（多进程）", anchor="start", weight="bold"))
     for cx, cw, l1, l2 in procs:
-        out.append(xchip(x + cx, 222, cw, 52, l1, l2))
+        out.append(xchip(x + cx, 180, cw, 52, l1, l2))
     for cx, cw, l1 in r2:
-        out.append(xchip(x + cx, 302, cw, 44, l1))
-    out.append(cline(x + zgap[0], 248, x + zgap[1] - 4, 248, BK, sw=1.4))
-    out.append(chead(x + zgap[1], 248, 0, BK, s=8))
-    out.append(xt(x + (zgap[0] + zgap[1]) / 2, 240, "ZeroMQ", fs=9))
-    out.append(xchip(x + 28, 400, 564, 36, "KV cache · HBM 显存池（paged，随卡）"))
+        out.append(xchip(x + cx, 268, cw, 44, l1))
+    out.append(cline(x + zgap[0], 206, x + zgap[1] - 4, 206, BK, sw=1.4))
+    out.append(chead(x + zgap[1], 206, 0, BK, s=8))
+    out.append(xt(x + (zgap[0] + zgap[1]) / 2, 196, "ZeroMQ", fs=9))
+    out.append(xt(x + (zgap[0] + zgap[1]) / 2, 222, zpayload, fs=8))
     gw = 564 / 8
     for i in range(8):
-        out.append(xr(x + 28 + i * gw, 450, gw - 6, 50, sw=1.5, rx=3))
-        out.append(xt(x + 28 + i * gw + (gw - 6)/2, 480, str(i), weight="bold"))
-    out.append(xt(x + 310, 522, "8 × GPU · NVLink 全互联", fs=11))
+        out.append(xr(x + 28 + i * gw, 358, gw - 10, 50, sw=1.5, rx=3))
+        out.append(xt(x + 28 + i * gw + (gw - 10)/2, 388, str(i), weight="bold"))
+    out.append(xchip(x + 28, 420, 564, 34, "KV cache · HBM 显存池（paged，随卡）"))
+    out.append(xchip(x + 28, 490, 564, 34, "主机内存 DDR（HiCache 层）", fs=11.5))
     return out
 
 parts = []
-parts += machine_ex(60, "Prefill 实例 · b300-01（整机独占）",
-    [(28, 190, "HTTP Server", "TokenizerManager"),
-     (260, 330, "Scheduler ×8（TP rank 进程）", "waiting 队列 → 每步组 batch")],
+parts += machine_ex(60, "Prefill 实例 · b300-01",
+    [(28, 180, "HTTP Server", "TokenizerManager"),
+     (300, 290, "Scheduler ×8（TP rank 进程）", "连续批处理：waiting → 每步一批")],
     [(28, 240, "Model Runner · CUDA graph"), (300, 240, "Mooncake TE / NIXL（发）")],
-    (218, 260))
-parts += [xchip(88, 560, 270, 34, "NVMe（权重 · KV 第三层）", fs=11.5),
-          xchip(380, 560, 272, 34, "主机内存 DDR（HiCache 层）", fs=11.5)]
-parts += machine_ex(720, "Decode 实例 · b300-03（LWS 组代表机）",
-    [(28, 300, "Scheduler ×8（TP rank 进程）", "每步全体 running 各出 1 token"),
+    (212, 300), "token ids · 参数")
+parts += [xchip(88, 560, 564, 34, "NVMe（KV 第三层）", fs=11.5)]
+parts += machine_ex(720, "Decode 实例 · b300-03",
+    [(28, 270, "Scheduler ×8（TP rank 进程）", "每步全体 running 各出 1 token"),
      (360, 230, "DetokenizerManager", "增量还原文本")],
     [(28, 240, "Mooncake TE / NIXL（收）"), (300, 240, "Model Runner · CUDA graph")],
-    (328, 360))
-parts += [xchip(748, 560, 270, 34, "NVMe（权重）", fs=11.5),
-          xchip(1040, 560, 272, 34, "主机内存 DDR（HiCache 层）", fs=11.5)]
-parts += [xr(60, 750, 1280, 30, sw=2.4, rx=6), xt(700, 770, "计算网 · RDMA（IB / RoCE）", weight="bold")]
+    (302, 360), "新 token ids")
+parts += [xchip(748, 560, 564, 34, "NVMe（KV 第三层）", fs=11.5)]
+parts += [xr(60, 640, 1280, 30, sw=2.4, rx=6), xt(700, 660, "计算网 · RDMA（IB / RoCE）", weight="bold")]
 
 execute = parts + [
-    ctext(60, 88, "① 请求送入：gateway 逐请求（HTTP，非批）→ Tokenizer 转 token ids，经 ZeroMQ 交给 Scheduler", PURPLE, fs=11.5),
-    ctext(60, 106, "② 组批：Scheduler（独立进程）每步组一个 batch——连续批处理，新请求随进、完成随出", PURPLE, fs=11.5),
-    ctext(60, 124, "③ 前向：CPU 下发 kernel（CUDA graph）→ GPU 计算 → 新 token ids 回传（D2H）；KV 写入 HBM", PURPLE, fs=11.5),
-    ctext(60, 142, "④ KV 传输：Mooncake / NIXL 经 RDMA 直达对端 HBM（GPUDirect，不经 CPU / DDR）", PURPLE, fs=11.5),
-    ctext(760, 88, "⑤ decode：同 ②③ 机制，每步全体 running 请求各生成 1 token", PURPLE, fs=11.5),
-    ctext(760, 106, "⑥ detokenize（独立进程）→ SSE 流回 gateway（见请求期）", PURPLE, fs=11.5),
-    ctext(760, 124, "⑦ HiCache：HBM ⇄ PCIe ⇄ DDR ⇄ NVMe，KV 分层换入换出", AUX, fs=11.5),
-    cline(255, 150, 255, 216, PURPLE), chead(255, 221, DOWN, PURPLE), cnum(255, 186, 1, PURPLE),
-    cline(1190, 216, 1190, 152, PURPLE), chead(1190, 147, UP, PURPLE), cnum(1190, 186, 6, PURPLE),
-    cnum(455, 222, 2, PURPLE), cnum(898, 222, 5, PURPLE),
-    cline(150, 348, 150, 394, PURPLE), chead(150, 399, DOWN, PURPLE),
-    cline(250, 398, 250, 352, PURPLE), chead(250, 347, UP, PURPLE),
-    cnum(200, 374, 3, PURPLE),
-    cline(600, 324, 692, 324, PURPLE),
-    cline(692, 324, 692, 745, PURPLE), chead(692, 750, DOWN, PURPLE),
-    cline(708, 750, 708, 324, PURPLE), cline(708, 324, 744, 324, PURPLE),
-    chead(749, 324, 0, PURPLE),
-    cnum(692, 560, 4, PURPLE),
-    cline(658, 438, 658, 558, AUX, sw=3.5), chead(658, 436, UP, AUX), chead(658, 560, DOWN, AUX),
-    cline(378, 577, 362, 577, AUX, sw=3.5), chead(360, 577, LEFT, AUX), chead(380, 577, 0, AUX),
-    cnum(658, 498, 7, AUX),
+    cline(255, 96, 255, 172, PURPLE), chead(255, 177, DOWN, PURPLE), cnum(255, 132, 1, PURPLE),
+    ctext(269, 104, "① gateway 双发（逐请求，非批）", PURPLE, fs=10.5),
+    cline(930, 96, 930, 172, PURPLE), chead(930, 177, DOWN, PURPLE), cnum(930, 132, 1, PURPLE),
+    ctext(916, 104, "① 同 P · 带 bootstrap，预分配 KV 块", PURPLE, anchor="end", fs=10.5),
+    cnum(455, 180, 2, PURPLE), cnum(898, 180, 5, PURPLE),
+    cline(420, 232, 420, 248, PURPLE), cline(420, 248, 208, 248, PURPLE),
+    cline(208, 248, 208, 263, PURPLE), chead(208, 267, DOWN, PURPLE, s=9),
+    ctext(260, 261, "本步 batch", PURPLE, fs=9.5),
+    cline(940, 232, 940, 248, PURPLE), cline(940, 248, 1140, 248, PURPLE),
+    cline(1140, 248, 1140, 263, PURPLE), chead(1140, 267, DOWN, PURPLE, s=9),
+    ctext(990, 261, "本步 batch", PURPLE, fs=9.5),
+    cline(145, 314, 145, 352, PURPLE), chead(145, 357, DOWN, PURPLE),
+    cline(250, 356, 250, 318, PURPLE), chead(250, 313, UP, PURPLE),
+    cnum(200, 335, 3, PURPLE),
+    ctext(268, 339, "kernel ↓ · token ids ↑ · KV 就地读写", PURPLE, fs=10),
+    cline(576.5, 312, 576.5, 416, PURPLE), ctext(583, 342, "控制", PURPLE, fs=9),
+    cline(813.5, 312, 813.5, 416, PURPLE), ctext(820, 342, "控制", PURPLE, fs=9),
+    cline(800, 268, 800, 244, PURPLE), chead(800, 233, UP, PURPLE),
+    ctext(808, 254, "④ 完成 → 入 running", PURPLE, fs=9),
+    cline(652, 437, 692, 437, PURPLE),
+    cline(692, 437, 692, 635, PURPLE), chead(692, 640, DOWN, PURPLE),
+    cline(708, 640, 708, 437, PURPLE), cline(708, 437, 743, 437, PURPLE),
+    chead(748, 437, 0, PURPLE),
+    cnum(692, 540, 4, PURPLE),
+    ctext(700, 694, "④ P 侧 HBM →（GPUDirect RDMA）→ D 侧 HBM，不经 CPU / DDR；Mooncake / NIXL 为控制面", PURPLE, anchor="middle", fs=11.5),
+    cline(516, 456, 516, 488, AUX), chead(516, 454, UP, AUX), chead(516, 490, DOWN, AUX),
+    cline(516, 526, 516, 558, AUX), chead(516, 524, UP, AUX), chead(516, 560, DOWN, AUX),
+    cnum(516, 472, 7, AUX), ctext(532, 476, "HiCache · PCIe", AUX, fs=10),
+    cline(1190, 172, 1190, 96, PURPLE), chead(1190, 91, UP, PURPLE), cnum(1190, 132, 6, PURPLE),
+    ctext(1176, 104, "⑥ detokenize → SSE 流回 gateway", PURPLE, anchor="end", fs=10.5),
 ]
 save("period_execute.svg", None, PURPLE, "执行期（每 token）", execute)
